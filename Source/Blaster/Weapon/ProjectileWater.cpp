@@ -15,10 +15,11 @@ void AProjectileWater::OnHit(UPrimitiveComponent *HitComp, AActor *OtherActor, U
         {
             if (OwnerCharacter->HasAuthority() && !bUseServerSideRewind)
             {
-                const float DamageToCause = Hit.BoneName.ToString() == FString("head") ? HeadShotDamage : Damage;
+                // const float DamageToCause = Hit.BoneName.ToString() == FString("head") ? HeadShotDamage : Damage;
+                const float DamageToCause = Damage;
                 UGameplayStatics::ApplyDamage(OtherActor, DamageToCause, OwnerController, this, UDamageType::StaticClass());
-                Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
-                return;
+                // Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
+                // return;
             }
         }
     }

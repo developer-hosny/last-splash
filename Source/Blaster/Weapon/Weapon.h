@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "Components/SphereComponent.h"
 #include <Components/SkeletalMeshComponent.h>
+#include <Components/ArrowComponent.h>
 #include "Components/WidgetComponent.h"
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Animation/AnimationAsset.h"
@@ -34,6 +35,8 @@ class BLASTER_API AWeapon : public AActor
 public:
 	// Sets default values for this actor's properties
 	AWeapon();
+
+	ABlasterCharacter *Character;
 
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -72,13 +75,25 @@ public:
 	float ZoomInterpSpeed = 20.f;
 
 	UPROPERTY(EditAnywhere, Category = Combat)
-	float FireDelay = 0.0033f;
+	float FireDelay = 0.5f;
 
 	UPROPERTY(EditAnywhere, Category = Combat)
-	bool bAutomatic = false;
+	bool bAutomatic = true;
 
 	UPROPERTY(EditAnywhere, Category = WaterAsFire, meta = (AllowPrivateAccess = "true"))
 	class UNiagaraComponent *WaterNiagara;
+
+#pragma region TracingVariables
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = " Tracing", meta = (AllowPrivateAccess = "true"))
+	TArray<TEnumAsByte<EObjectTypeQuery>> TraceSurfaceTraceTypes;
+
+#pragma endregion
+
+#pragma region Traces
+	FHitResult DoLineTraceSingleByObject(const FVector &Start, const FVector &End, bool bShowDebugShape = false, bool bDrawPersistantShapes = false);
+	FHitResult DoLineTraceStartFromWeapon();
+#pragma endregion
 
 protected:
 	// Called when the game starts or when spawned
@@ -107,6 +122,9 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
 	class USphereComponent *AreaSphere;
 
+	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
+	class UArrowComponent *Arrow;
+
 	UPROPERTY(ReplicatedUsing = OnRep_WeaponState, VisibleAnywhere, Category = "Weapon Properties")
 	EWeaponState WeaponState;
 
@@ -121,6 +139,13 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class ACasing> CasingClass;
+
+	// #pragma region TracingVariables
+
+	// 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character Movment: Tracing", meta = (AllowPrivateAccess = "true"))
+	// 	TArray<TEnumAsByte<EObjectTypeQuery>> TraceSurfaceTraceTypes;
+
+	// #pragma endregion
 
 public:
 	void SetWeaponState(EWeaponState State);

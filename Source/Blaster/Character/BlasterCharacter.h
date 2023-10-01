@@ -175,6 +175,11 @@ private:
 	UPROPERTY(EditAnywhere)
 	class USoundCue *ElimBotSound;
 
+	float AO_Yaw;
+	float AO_Pitch;
+	FRotator StatringAimRotation;
+
+public:
 #pragma region ClimbTraces
 
 	TArray<FHitResult> DoCapsuleTraceMultiByObject(const FVector &Start, const FVector &End, bool bShowDebugShape = false, bool bDrawPersistantShapes = false);
@@ -183,7 +188,6 @@ private:
 
 #pragma endregion
 
-public:
 	void SetOverlappingWeapon(AWeapon *Weapon);
 	void SetOverlappingFlyboard(AFlyboard *Flyboard);
 	bool IsWeaponEquipped();
@@ -222,7 +226,7 @@ public:
 	UInputAction *FireAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction *UpDownAction;
+	UInputAction *VerticalMovementAction;
 
 #pragma endregion
 
@@ -234,7 +238,7 @@ public:
 	void HandleMovementInputPressed(const FInputActionValue &Value);
 	void HandleGroundMovementInput(const FInputActionValue &Value);
 	void HandleFlyboardMovementInput(const FInputActionValue &Value);
-	void HandleMoveUpDown(const FInputActionValue &Value);
+	void HandleVerticalMovement(const FInputActionValue &Value);
 
 	void Look(const FInputActionValue &Value);
 	void CrouchButtonPressed();
@@ -242,6 +246,7 @@ public:
 	void AimButtonReleased();
 	void FireButtonPressed();
 	void FireButtonReleased();
+	void AimOffset(float DeltaTime);
 
 	void CheckDistanceToFloor();
 #pragma endregion
@@ -252,7 +257,7 @@ public:
 	UPROPERTY(EditAnywhere)
 	float MaxFlyUp = 10000.0f;
 	UPROPERTY(EditAnywhere)
-	float MaxFlyDown = 5000.0f;
+	float MaxFlyDown = 100.0f;
 
 	bool CanMoveForward = true;
 
@@ -263,6 +268,57 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character Movment: Tracing", meta = (AllowPrivateAccess = "true"))
 	TArray<TEnumAsByte<EObjectTypeQuery>> TraceSurfaceTraceTypes;
+
+#pragma endregion
+
+	FORCEINLINE float GetAO_Yaw() const
+	{
+		return AO_Yaw;
+	}
+
+	FORCEINLINE float GetAO_Pitch() const
+	{
+		return AO_Pitch;
+	}
+
+#pragma region FixVerticalMoveAfrerHit
+
+	FTimerHandle TimerHandleResetIsReceviedHit;
+	void ResetIsReceviedHit();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Hit, meta = (AllowPrivateAccess = "true"))
+	bool IsReceviedHit = false;
+	FORCEINLINE bool GetIsReceviedHit() const { return IsReceviedHit; }
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Hit, meta = (AllowPrivateAccess = "true"))
+	ABlasterCharacter *AttackerCharacter;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Hit, meta = (AllowPrivateAccess = "true"))
+	ABlasterCharacter *DamageCharacter;
+
+#pragma endregion
+
+#pragma region TraceLinesVarables
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Trace Debug Lines", meta = (AllowPrivateAccess = "true"))
+	bool ShowTraceAimDebugLine = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Trace Debug Lines", meta = (AllowPrivateAccess = "true"))
+	bool ShowTraceCheckDistanceToFloor = false;
+#pragma endregion
+
+#pragma region ClientMovement
+	// Replicated variables
+	UPROPERTY(ReplicatedUsing = OnRep_CharacterMovment)
+	FVector ReplicatedLocation;
+	UPROPERTY(ReplicatedUsing = OnRep_CharacterMovment)
+	FRotator ReplicatedRotation;
+
+	// // Override ReplicateMovement to set bReplicateMovement
+	// virtual bool ReplicateSubobjects(class UActorChannel *Channel, class FOutBunch *Bunch, FReplicationFlags *RepFlags) override;
+
+	UFUNCTION()
+	void OnRep_CharacterMovment();
 
 #pragma endregion
 };

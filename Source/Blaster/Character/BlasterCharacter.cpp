@@ -15,45 +15,49 @@
 #include "Blaster/Flyboard/Flyboard.h"
 #include "Blaster/Helper/DebugHelper.h"
 #include "Kismet/KismetSystemLibrary.h"
-#include <Kismet/KismetMathLibrary.h>
+#include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
 ABlasterCharacter::ABlasterCharacter()
 {
 
 	PrimaryActorTick.bCanEverTick = true;
-	// bReplicates = true;
+	bReplicates = true;
+	SetReplicateMovement(true);
 
 	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom2"));
 	CameraBoom->SetupAttachment(GetMesh());
 	CameraBoom->TargetArmLength = 350;
 	CameraBoom->bUsePawnControlRotation = true;
 
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera2"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
 	// Make mouse look around character
-	bUseControllerRotationYaw = false;
-	GetCharacterMovement()->bOrientRotationToMovement = true;
+	// bUseControllerRotationYaw = false;
+	// GetCharacterMovement()->bOrientRotationToMovement = true;
 
-	OverheadWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
+	OverheadWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget2"));
 	OverheadWidget->SetupAttachment(RootComponent);
 
-	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CompactComponent"));
+	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CompactComponent2"));
 	Combat->SetIsReplicated(true);
 
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
+	GetCharacterMovement()->NavAgentProps.bCanFly = true;
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
 	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
 
+	// SetRootComponent(GetMesh());
+
 	NetUpdateFrequency = 66.f;
 	MinNetUpdateFrequency = 33.f;
 
-	DissolveTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimelineComponent"));
+	DissolveTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimelineComponent2"));
 }
 
 // Called when the game starts or when spawned
@@ -77,7 +81,7 @@ void ABlasterCharacter::BeginPlay()
 
 	if (HasAuthority())
 	{
-		OnTakeAnyDamage.AddDynamic(this, &ABlasterCharacter::ReceiveDamage);
+		OnTakeAnyDamage.AddDynamic(this, &ThisClass::ReceiveDamage);
 	}
 }
 
@@ -89,6 +93,9 @@ void ABlasterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty> &Ou
 	DOREPLIFETIME_CONDITION(ABlasterCharacter, OverlappingFlyboard, COND_OwnerOnly);
 	// DOREPLIFETIME(ABlasterCharacter, ZValue);
 	DOREPLIFETIME(ABlasterCharacter, Health);
+
+	DOREPLIFETIME(ABlasterCharacter, ReplicatedLocation);
+	DOREPLIFETIME(ABlasterCharacter, ReplicatedRotation);
 }
 
 void ABlasterCharacter::PostInitializeComponents()
@@ -111,8 +118,8 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent *PlayerInputCo
 	{
 
 		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ThisClass::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::StopJumping);
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::HandleMovementInputPressed);
@@ -134,7 +141,7 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent *PlayerInputCo
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ThisClass::FireButtonPressed);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ThisClass::FireButtonReleased);
 
-		EnhancedInputComponent->BindAction(UpDownAction, ETriggerEvent::Triggered, this, &ThisClass::HandleMoveUpDown);
+		EnhancedInputComponent->BindAction(VerticalMovementAction, ETriggerEvent::Triggered, this, &ThisClass::HandleVerticalMovement);
 	}
 }
 
@@ -248,7 +255,7 @@ void ABlasterCharacter::PlayHitReactMontage()
 	UAnimInstance *AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && HitReactMontage)
 	{
-		AnimInstance->Montage_Play(FireWeaponMontage);
+		AnimInstance->Montage_Play(HitReactMontage);
 		FName SectionName("FromFront");
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
@@ -256,10 +263,41 @@ void ABlasterCharacter::PlayHitReactMontage()
 
 void ABlasterCharacter::ReceiveDamage(AActor *DamagedActor, float Damage, const UDamageType *DamageType, AController *InstigatorController, AActor *DamageCauser)
 {
+	IsReceviedHit = true;
+
+	// Debug::Print(IsReceviedHit ? "IsReceviedHit: true" : "IsReceviedHit: flase", FColor::Purple, 2);
+
+	BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
+	ABlasterPlayerController *AttackerController = Cast<ABlasterPlayerController>(InstigatorController);
+
+	AttackerCharacter = Cast<ABlasterCharacter>(GetOwner());
+	DamageCharacter = Cast<ABlasterCharacter>(DamagedActor);
+
+	if (BlasterPlayerController == AttackerController)
+	{
+		// Debug::Print("Hit Self", FColor::Purple, 2);
+		return;
+	}
+
+	// Debug::Print(FString::SanitizeFloat(Damage), FColor::Purple, 3);
 
 	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
 	UpdateHUDHealth();
-	PlayHitReactMontage();
+
+	FVector ForwardVector = AttackerController->GetCharacter()->GetActorForwardVector();
+	ForwardVector.Normalize(); // Ensure it's a unit vector
+	DamageCharacter->LaunchCharacter(ForwardVector * 1000.f, false, false);
+	// DamageCharacter->GetMovementComponent()->AddInputVector(ForwardVector * 1000.f);
+
+	// FVector ImpulseForce = ForwardVector * 1000.f; // ImpulseMagnitude is the strength of the impulse
+	// FVector Location = DamageCharacter->GetActorLocation();
+	// UPrimitiveComponent *PrimitiveComponent = Cast<UPrimitiveComponent>(RootComponent);
+	// if (PrimitiveComponent)
+	// {
+	// 	// PrimitiveComponent->AddForce(FVector(ImpulseForce.X, ImpulseForce.Y, ForwardVector.Z));
+	// 	PrimitiveComponent->AddForceAtLocation(ImpulseForce, Location);
+	// 	PrimitiveComponent->AddImpulseAtLocation(ImpulseForce, Location);
+	// }
 
 	if (Health <= 0.f)
 	{
@@ -267,8 +305,8 @@ void ABlasterCharacter::ReceiveDamage(AActor *DamagedActor, float Damage, const 
 
 		if (BlasterGameMode)
 		{
-			BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
-			ABlasterPlayerController *AttackerController = Cast<ABlasterPlayerController>(InstigatorController);
+			// BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
+			// ABlasterPlayerController *AttackerController = Cast<ABlasterPlayerController>(InstigatorController);
 
 			BlasterGameMode->PlayerEliminated(this, BlasterPlayerController, AttackerController);
 		}
@@ -334,6 +372,8 @@ void ABlasterCharacter::FireButtonPressed()
 	if (IsWeaponEquipped())
 	{
 		Combat->FireButtonPressed(true);
+		GetCharacterMovement()->bOrientRotationToMovement = false;
+		bUseControllerRotationYaw = true;
 	}
 }
 
@@ -422,11 +462,17 @@ void ABlasterCharacter::OnRep_OverlappingWeapon(AWeapon *LastWeapon)
 void ABlasterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// Debug::Print(IsReceviedHit ? "IsReceviedHit: true" : "IsReceviedHit: flase", FColor::Purple, 2);
+
 	HideCameraIfCharacterClose();
 	PollInit();
 
-	CheckDistanceToFloor();
+	// CheckDistanceToFloor();
 
+	AimOffset(DeltaTime);
+
+	// Debug::Print(IsMoveInputIgnored() ? "true" : "false", FColor::Yellow, 1);
 	// FVector Start = GetActorLocation();
 	// FVector End = Start + GetActorForwardVector();
 
@@ -436,32 +482,36 @@ void ABlasterCharacter::Tick(float DeltaTime)
 void ABlasterCharacter::CheckDistanceToFloor()
 {
 	// Draw forward line
-	const FVector ComponentLocation = GetActorLocation();
+	const FVector ActorLocation = GetActorLocation();
 	const FVector EyeHeightOffset = GetActorUpVector() * (100.0f + 100.0f);
-	const FVector Start = ComponentLocation + EyeHeightOffset;
-	const FVector End = Start + GetActorForwardVector() * 5000.0f;
-	DoLineTraceSingleByObject(Start, End, true, false);
+	const FVector Start = ActorLocation + EyeHeightOffset;
+	const FVector End = Start + GetActorForwardVector() * 2000.0f;
+	DoLineTraceSingleByObject(Start, End, ShowTraceCheckDistanceToFloor, false);
 
 	// Draw line to floor
 	FVector DownVector = GetActorRotation().RotateVector(FVector(0, 0, -1));
 	FVector StartLocation = End;
 	FVector EndLocation = StartLocation - DownVector * -5000.0f;
-	FHitResult HitResult = DoLineTraceSingleByObject(StartLocation, EndLocation, true, false);
+	FHitResult HitResult = DoLineTraceSingleByObject(StartLocation, EndLocation, ShowTraceCheckDistanceToFloor, false);
 
 	DistanceToFloor = FVector::Distance(Start, HitResult.ImpactPoint);
+
+	// Debug::Print("DistanceToFloor: " + FString::SanitizeFloat(DistanceToFloor), FColor::Red, 1);
+
+	// DoCapsuleTraceMultiByObject(ActorLocation, ActorLocation, true, false);
 
 	if (HitResult.GetActor() == nullptr || HitResult.GetActor()->GetName().IsEmpty())
 		return;
 
 	if (HitResult.GetActor()->GetName().StartsWith("Water"))
 	{
-		Debug::Print("Water", FColor::Red, 1);
+		// Debug::Print("Water", FColor::Red, 1);
 		CanMoveForward = true;
 	}
 	else
 	{
-		Debug::Print("Land", FColor::Red, 1);
-		CanMoveForward = false;
+		// Debug::Print("Land", FColor::Red, 1);
+		// CanMoveForward = false;
 	}
 }
 void ABlasterCharacter::HandleMovementInputPressed(const FInputActionValue &Value)
@@ -501,6 +551,8 @@ void ABlasterCharacter::HandleGroundMovementInput(const FInputActionValue &Value
 
 void ABlasterCharacter::HandleFlyboardMovementInput(const FInputActionValue &Value)
 {
+	CheckDistanceToFloor();
+
 	// input is a Vector2D
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 
@@ -516,7 +568,6 @@ void ABlasterCharacter::HandleFlyboardMovementInput(const FInputActionValue &Val
 		// get right vector
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		// add movement
 		if (GetCanMoveForward())
 		{
 			AddMovementInput(ForwardDirection, MovementVector.Y);
@@ -525,31 +576,36 @@ void ABlasterCharacter::HandleFlyboardMovementInput(const FInputActionValue &Val
 	}
 }
 
-void ABlasterCharacter::HandleMoveUpDown(const FInputActionValue &Value)
+void ABlasterCharacter::HandleVerticalMovement(const FInputActionValue &Value)
 {
-
-	if (Combat && Combat->EquippedFlyboard)
+	// Fix Vertical Move Afrer Hit
+	if (IsReceviedHit)
 	{
-		if (Controller != nullptr)
+		EquipButtonPressed();
+		IsReceviedHit = false;
+	}
+
+	// CheckDistanceToFloor();
+
+	if (Combat && Combat->EquippedFlyboard && Controller != nullptr)
+	{
+
+		float ZValue = Value.Get<float>();
+		float VerticalSpeed = 1.5f;
+
+		if (ZValue > 0.f && DistanceToFloor >= MaxFlyUp)
 		{
-			float ZValue = Value.Get<float>();
-			float Speed = 1.5f;
-
-			if (ZValue > 0.f && DistanceToFloor >= MaxFlyUp)
-			{
-				Speed = 1.5f;
-				return;
-			}
-
-			if (ZValue < 0.f && DistanceToFloor <= MaxFlyDown)
-			{
-				Speed = 0.1f;
-				return;
-			}
-
-			AddMovementInput(FVector(0.0f, 0.0f, ZValue), Speed, false);
-			// UE_LOG(LogTemp, Warning, TEXT("ZValue %f"), ZValue);
+			VerticalSpeed = 1.5f;
+			return;
 		}
+
+		if (ZValue < 0.f && DistanceToFloor <= MaxFlyDown)
+		{
+			VerticalSpeed = 0.1f;
+			return;
+		}
+
+		AddMovementInput(FVector(0.0f, 0.0f, ZValue), VerticalSpeed, true);
 	}
 }
 
@@ -698,7 +754,7 @@ TArray<FHitResult> ABlasterCharacter::DoCapsuleTraceMultiByObject(const FVector 
 
 	UKismetSystemLibrary::CapsuleTraceMultiForObjects(
 		this, Start, End,
-		50.0f,
+		500.0f,
 		70.0f,
 		TraceSurfaceTraceTypes,
 		false,
@@ -734,9 +790,41 @@ FHitResult ABlasterCharacter::DoLineTraceSingleByObject(const FVector &Start, co
 		TArray<AActor *>(),
 		DebugTraceType,
 		OutHit,
-		false,
-		FLinearColor::Red);
+		false);
 
 	return OutHit;
 }
 #pragma endregion
+
+void ABlasterCharacter::AimOffset(float DeltaTime)
+{
+	if (Combat && Combat->EquippedWeapon == nullptr)
+		return;
+
+	FVector Velocity = GetVelocity();
+	Velocity.Z = 0.f;
+	float Speed = Velocity.Size();
+	bool IsInAir = GetCharacterMovement()->IsFalling();
+
+	if (Speed == 0.f && !IsInAir) // Standing, Still not jumbing
+	{
+		FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+		FRotator DeltaRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StatringAimRotation);
+		AO_Yaw = DeltaRotation.Yaw;
+		// bUseControllerRotationYaw = false;
+	}
+
+	if (Speed > 0.f && IsInAir) // Jumbing
+	{
+		StatringAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+		AO_Yaw = 0.f;
+		// bUseControllerRotationYaw = true;
+	}
+
+	AO_Pitch = GetBaseAimRotation().Pitch;
+}
+
+void ABlasterCharacter::OnRep_CharacterMovment()
+{
+	// Debug::Print(ReplicatedLocation.ToString());
+}

@@ -9,6 +9,8 @@
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Blaster/PlayerController/BlasterPlayerController.h"
 #include "TimerManager.h"
+#include "Blaster/Helper/DebugHelper.h"
+#include "Blaster/Helper/DebugHelper.h"
 
 #define TRACE_LENGTH 8000.f;
 
@@ -29,10 +31,16 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 
 	if (Character && Character->IsLocallyControlled())
 	{
-		FHitResult HitResult;
-		TraceUnderCrosshairs(HitResult);
-		HitTarget = HitResult.ImpactPoint;
+		// FHitResult HitResult;
+		// TraceUnderCrosshairs(HitResult);
+		// HitTarget = HitResult.ImpactPoint;
 
+		// if (EquippedWeapon)
+		// {
+		// 	FHitResult HitResult = EquippedWeapon->DoLineTraceStartFromWeapon();
+		// 	HitTarget = HitResult.ImpactPoint;
+		// 	Debug::Print(HitTarget.ToString());
+		// }
 		SetHUDCrosshairs(DeltaTime);
 		InterpFOV(DeltaTime);
 	}
@@ -87,32 +95,86 @@ void UCombatComponent::ServerSetAiming_Implementation(bool bIsAiming)
 void UCombatComponent::FireButtonPressed(bool bPressed)
 {
 	bFireButtonPressed = bPressed;
-	if (bFireButtonPressed)
+	if (bFireButtonPressed == true)
 	{
-		Fire();
-	}
+		// Fire();
+		ServerWater(true);
+		bCanFire = true;
+		StartFireTimer();
 
+		// if (Character)
+		// {
+		// 	Character->PlayFireMontage(bAiming);
+		// 	EquippedWeapon->Fire(TraceHitTarget);
+		// }
+		// Debug::Print("bFireButtonPressed : True");
+	}
+	else
+	{
+		ServerWater(false);
+		bCanFire = false;
+		// Debug::Print("bFireButtonPressed : False");
+	}
+}
+
+// void UCombatComponent::Fire()
+// {
+// 	if (CanFire())
+// 	{
+// 		bCanFire = false;
+// 		ServerFire(HitTarget);
+// 		// StartFireTimer();
+// 	}
+// }
+
+// void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize &TraceHitTarget)
+// {
+// 	MulticastFire(TraceHitTarget);
+// }
+
+// void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize &TraceHitTarget)
+// {
+// 	if (EquippedWeapon == nullptr)
+// 		return;
+// 	if (Character)
+// 	{
+// 		Character->PlayFireMontage(bAiming);
+// 		EquippedWeapon->Fire(TraceHitTarget);
+// 	}
+// }
+
+void UCombatComponent::ServerWater_Implementation(bool bIsWaterPressed)
+{
+	MulticastWater(bIsWaterPressed);
+}
+
+void UCombatComponent::MulticastWater_Implementation(bool bIsWaterPressed)
+{
 	if (EquippedWeapon && EquippedWeapon->WaterNiagara)
 	{
-
-		if (!EquippedWeapon->WaterNiagara->IsActive())
+		if (bIsWaterPressed)
 		{
 			EquippedWeapon->WaterNiagara->Activate();
+			FVector HitTarget;
+			if (EquippedWeapon)
+			{
+				FHitResult HitResult = EquippedWeapon->DoLineTraceStartFromWeapon();
+				HitTarget = HitResult.ImpactPoint;
+				// Debug::Print(HitTarget.ToString());
+			}
+
+			if (!HitTarget.IsZero())
+			{
+
+				EquippedWeapon->Fire(HitTarget);
+				Character->PlayFireMontage(bAiming);
+				// Debug::Print(HitTarget.ToString());
+			}
 		}
 		else
 		{
 			EquippedWeapon->WaterNiagara->Deactivate();
 		}
-	}
-}
-
-void UCombatComponent::Fire()
-{
-	if (CanFire())
-	{
-		bCanFire = false;
-		ServerFire(HitTarget);
-		StartFireTimer();
 	}
 }
 
@@ -129,13 +191,14 @@ void UCombatComponent::StartFireTimer()
 
 void UCombatComponent::FireTimerFinished()
 {
-	if (EquippedWeapon == nullptr)
+	if (EquippedWeapon == nullptr || bCanFire == false)
 		return;
-	bCanFire = true;
-	if (bFireButtonPressed && EquippedWeapon->bAutomatic)
-	{
-		Fire();
-	}
+	// bCanFire = true;
+
+	// Debug::Print("StartFireTimer Called");
+	FireButtonPressed(true);
+	// EquippedWeapon->Fire(HitTarget);
+	// StartFireTimer();
 }
 
 bool UCombatComponent::CanFire()
@@ -286,22 +349,6 @@ void UCombatComponent::InterpFOV(float DeltaTime)
 	}
 }
 
-void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize &TraceHitTarget)
-{
-	MulticastFire(TraceHitTarget);
-}
-
-void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize &TraceHitTarget)
-{
-	if (EquippedWeapon == nullptr)
-		return;
-	if (Character)
-	{
-		Character->PlayFireMontage(bAiming);
-		EquippedWeapon->Fire(TraceHitTarget);
-	}
-}
-
 #pragma region Equipment
 
 void UCombatComponent::EquipWeapon(AWeapon *WeaponToEquip)
@@ -310,6 +357,7 @@ void UCombatComponent::EquipWeapon(AWeapon *WeaponToEquip)
 		return;
 
 	EquippedWeapon = WeaponToEquip;
+	EquippedWeapon->WaterNiagara->Deactivate();
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 
 	const USkeletalMeshSocket *HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
@@ -321,8 +369,8 @@ void UCombatComponent::EquipWeapon(AWeapon *WeaponToEquip)
 
 	EquippedWeapon->SetOwner(Character);
 
-	Character->GetCharacterMovement()->bOrientRotationToMovement = false;
-	Character->bUseControllerRotationYaw = true;
+	// Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+	// Character->bUseControllerRotationYaw = true;
 }
 
 void UCombatComponent::OnRep_EquippedWeapon()
@@ -338,8 +386,8 @@ void UCombatComponent::OnRep_EquippedWeapon()
 			HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
 		}
 
-		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
-		Character->bUseControllerRotationYaw = true;
+		// Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+		// Character->bUseControllerRotationYaw = true;
 	}
 }
 
@@ -360,6 +408,7 @@ void UCombatComponent::EquipFlyboard(AFlyboard *FlyBoardToEquip)
 	}
 
 	EquippedFlyboard->SetOwner(Character);
+	// Character->bUseControllerRotationYaw = true;
 }
 
 void UCombatComponent::OnRep_EquippedFlyboard()
@@ -375,5 +424,6 @@ void UCombatComponent::OnRep_EquippedFlyboard()
 			FlyBoardSocket->AttachActor(EquippedFlyboard, Character->GetMesh());
 		}
 	}
+	// Character->bUseControllerRotationYaw = true;
 }
 #pragma endregion

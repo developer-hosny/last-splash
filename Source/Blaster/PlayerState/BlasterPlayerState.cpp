@@ -44,7 +44,7 @@ void ABlasterPlayerState::OnRep_Score()
 
     Character = Character == nullptr ? Cast<ABlasterCharacter>(GetPawn()) : Character;
 
-    if (GetCharacter())
+    if (Character)
     {
         Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
 
@@ -58,8 +58,8 @@ void ABlasterPlayerState::OnRep_Score()
 void ABlasterPlayerState::AddToScore(int32 ScoreAmount)
 {
     SetScore(GetScore() + ScoreAmount);
-    // Character = Character == nullptr ? Cast<ABlasterCharacter>(GetPawn()) : Character;
-    if (GetCharacter())
+    Character = Character == nullptr ? Cast<ABlasterCharacter>(GetPawn()) : Character;
+    if (Character)
     {
         Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
         if (Controller)

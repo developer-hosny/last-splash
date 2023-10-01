@@ -28,12 +28,12 @@ public:
 	FVector_NetQuantize TraceStart;
 	FVector_NetQuantize100 InitialVelocity;
 
-	UPROPERTY(EditAnywhere)
-	float InitialSpeed = 30000.f;
+	// UPROPERTY(EditAnywhere)
+	// float InitialSpeed = 200000.f;
 
 	// Only set this for Grenades and Rockets
 	UPROPERTY(EditAnywhere)
-	float Damage = 20.f;
+	float Damage = 5.f;
 
 	// Doesn't matter for Grenades and Rockets
 	UPROPERTY(EditAnywhere)
@@ -46,12 +46,12 @@ protected:
 	UFUNCTION()
 	virtual void OnHit(UPrimitiveComponent *HitComp, AActor *OtherActor, UPrimitiveComponent *OtherComp, FVector NormalImpulse, const FHitResult &Hit);
 
+	UPROPERTY(VisibleAnywhere)
+	class UProjectileMovementComponent *ProjectileMovementComponent;
+
 private:
 	UPROPERTY(EditAnywhere)
 	class UBoxComponent *CollisionBox;
-
-	UPROPERTY(VisibleAnywhere)
-	class UProjectileMovementComponent *ProjectileMovementComponent;
 
 	UPROPERTY(EditAnywhere)
 	class UParticleSystem *Tracer;
@@ -68,7 +68,7 @@ private:
 	FTimerHandle DestroyTimer;
 
 	UPROPERTY(EditDefaultsOnly)
-	float DestroyDelay = 0.15f;
+	float DestroyDelay = 0.0033f;
 
 	void DestroyTimerFinished();
 

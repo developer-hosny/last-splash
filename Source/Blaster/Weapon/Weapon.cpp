@@ -2,15 +2,19 @@
 
 #include "Weapon.h"
 #include "NiagaraComponent.h"
+#include "Blaster/Helper/DebugHelper.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Blaster/PlayerController/BlasterPlayerController.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 AWeapon::AWeapon()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = true;
 
-	WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Weapon Mesh"));
+	WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 	WeaponMesh->SetupAttachment(RootComponent);
 	SetRootComponent(WeaponMesh);
 
@@ -18,17 +22,21 @@ AWeapon::AWeapon()
 	WeaponMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Ignore);
 	WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	Arrow = CreateDefaultSubobject<UArrowComponent>(TEXT("Arrow"));
+	// Attach the arrow component to the actor.
+	Arrow->AttachToComponent(WeaponMesh, FAttachmentTransformRules::KeepRelativeTransform);
+
 	AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
-	AreaSphere->SetupAttachment(RootComponent);
+	AreaSphere->SetupAttachment(WeaponMesh);
 	AreaSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	PickupWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("PickupWidget"));
-	PickupWidget->SetupAttachment(RootComponent);
+	PickupWidget->SetupAttachment(WeaponMesh);
 
 	WaterNiagara = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NS_Water"));
-	WaterNiagara->SetupAttachment(WeaponMesh);
-	// WaterNiagara->Activate(true);
+	WaterNiagara->AttachToComponent(WeaponMesh, FAttachmentTransformRules::KeepRelativeTransform, FName("WaterSocket"));
+	WaterNiagara->SetAutoActivate(false);
 }
 
 // Called when the game starts or when spawned
@@ -53,21 +61,21 @@ void AWeapon::BeginPlay()
 void AWeapon::OnSphereOverlap(UPrimitiveComponent *OverlappedComponent, AActor *OtherActor, UPrimitiveComponent *OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult &SweepResult)
 {
 
-	ABlasterCharacter *BlasterCharacter = Cast<ABlasterCharacter>(OtherActor);
+	Character = Cast<ABlasterCharacter>(OtherActor);
 
-	if (BlasterCharacter)
+	if (Character)
 	{
-		BlasterCharacter->SetOverlappingWeapon(this);
+		Character->SetOverlappingWeapon(this);
 	}
 }
 
 void AWeapon::OnSphereEndOverlap(UPrimitiveComponent *OverlappedComponent, AActor *OtherActor, UPrimitiveComponent *OtherComp, int32 OtherBodyIndex)
 {
-	ABlasterCharacter *BlasterCharacter = Cast<ABlasterCharacter>(OtherActor);
+	Character = Cast<ABlasterCharacter>(OtherActor);
 
-	if (BlasterCharacter)
+	if (Character)
 	{
-		BlasterCharacter->SetOverlappingWeapon(nullptr);
+		Character->SetOverlappingWeapon(nullptr);
 	}
 }
 
@@ -133,10 +141,35 @@ void AWeapon::OnRep_WeaponState()
 	}
 }
 
-// Called every frame
 void AWeapon::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	DoLineTraceStartFromWeapon();
+}
+
+FHitResult AWeapon::DoLineTraceStartFromWeapon()
+{
+	FHitResult HitResult;
+
+	if (Character)
+	{
+		const USkeletalMeshSocket *WaterSocket = GetWeaponMesh()->GetSocketByName(FName("WaterSocket"));
+		if (WaterSocket)
+		{
+			FTransform SocketTransform = WaterSocket->GetSocketTransform(GetWeaponMesh());
+			FVector Start = SocketTransform.GetLocation();
+			FVector SocketForwardVector = SocketTransform.GetRotation().GetForwardVector();
+			FVector End = Start + SocketForwardVector * 8000.0f;
+
+			HitResult = DoLineTraceSingleByObject(
+				Start,
+				End,
+				Character->ShowTraceAimDebugLine,
+				false);
+		}
+	}
+
+	return HitResult;
 }
 
 void AWeapon::ShowPickupWidget(bool bShowWidget)
@@ -162,6 +195,29 @@ void AWeapon::Fire(const FVector &HitTarget)
 	{
 		WeaponMesh->PlayAnimation(FireAnimation, false);
 	}
+
+	// const USkeletalMeshSocket *WaterSocket = WeaponMesh->GetSocketByName(FName("WaterSocket"));
+
+	// if (WaterSocket)
+	// {
+	// 	FTransform SocketTransform = WaterSocket->GetSocketTransform(GetWeaponMesh());
+	// 	UWorld *World = GetWorld();
+
+	// 	if (World)
+	// 	{
+	// 		// AActor *SpawnedObject = GetWorld()->SpawnActor<USphereComponent>(ASphere::StaticClass(), HitTarget, FRotator::ZeroRotator);
+
+	// 			World->SpawnActor<ACasing>(
+	// 				Water,
+	// 				SocketTransform.GetLocation(),
+	// 				SocketTransform.GetRotation().Rotator());
+
+	// 		// World->SpawnActor<USphereComponent>(
+	// 		// 	CasingClass,
+	// 		// 	SocketTransform.GetLocation(),
+	// 		// 	SocketTransform.GetRotation().Rotator());
+	// 	}
+	// }
 
 	// if (WaterNiagara)
 	// {
@@ -191,8 +247,41 @@ void AWeapon::Fire(const FVector &HitTarget)
 
 void AWeapon::Dropped()
 {
+	if (WaterNiagara)
+	{
+		WaterNiagara->SetAutoActivate(false);
+		WaterNiagara->Deactivate();
+	}
 	SetWeaponState(EWeaponState::EWS_Dropped);
 	FDetachmentTransformRules DetachRules(EDetachmentRule::KeepWorld, true);
 	WeaponMesh->DetachFromComponent(DetachRules);
 	SetOwner(nullptr);
+}
+
+FHitResult AWeapon::DoLineTraceSingleByObject(const FVector &Start, const FVector &End, bool bShowDebugShape, bool bDrawPersistentShapes)
+{
+	FHitResult OutHit;
+
+	EDrawDebugTrace::Type DebugTraceType = EDrawDebugTrace::None;
+
+	if (bShowDebugShape)
+	{
+		DebugTraceType = EDrawDebugTrace::ForOneFrame;
+
+		if (bDrawPersistentShapes)
+		{
+			DebugTraceType = EDrawDebugTrace::Persistent;
+		}
+	}
+
+	UKismetSystemLibrary::LineTraceSingleForObjects(
+		this, Start, End,
+		TraceSurfaceTraceTypes,
+		false,
+		TArray<AActor *>(),
+		DebugTraceType,
+		OutHit,
+		true);
+
+	return OutHit;
 }

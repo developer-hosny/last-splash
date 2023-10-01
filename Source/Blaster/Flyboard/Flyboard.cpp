@@ -13,13 +13,13 @@ AFlyboard::AFlyboard()
 
 	// DefaultRoot = CreateDefaultSubobject<USceneComponent>(TEXT("DefaultRoot"));
 	// SetRootComponent(RootComponent);
-
 	AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
-	AreaSphere->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform);
+	// AreaSphere->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform);
 	AreaSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetRootComponent(AreaSphere);
 
-	FlyboardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("JetMesh"));
+	FlyboardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Flyboard"));
 	FlyboardMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	FlyboardMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	FlyboardMesh->AttachToComponent(AreaSphere, FAttachmentTransformRules::KeepRelativeTransform);
@@ -38,8 +38,14 @@ AFlyboard::AFlyboard()
 	ThrusterLeft = CreateDefaultSubobject<UNiagaraComponent>(TEXT("ThrusterLeft"));
 	ThrusterRight = CreateDefaultSubobject<UNiagaraComponent>(TEXT("ThrusterRight"));
 
-	ThrusterLeft->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform);
-	ThrusterRight->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform);
+	// // FTransform ThrustLeft = FlyboardMesh->GetWeaponMesh()->GetSocketTransform(FName("ThrustLeft"), ERelativeTransformSpace::RTS_World);
+	// // FTransform ThrustRight = FlyboardMesh->GetWeaponMesh()->GetSocketTransform(FName("ThrustRight"), ERelativeTransformSpace::RTS_World);
+
+	ThrusterLeft->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform,
+									FName("ThrustLeft"));
+	ThrusterRight->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform,
+									 FName("ThrustRight"));
+	// // ThrusterRight->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform);
 }
 
 void AFlyboard::BeginPlay()

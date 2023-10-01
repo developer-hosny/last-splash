@@ -40,11 +40,17 @@ protected:
 
 	void FireButtonPressed(bool bPressed);
 
+	// UFUNCTION(Server, Reliable)
+	// void ServerFire(const FVector_NetQuantize &TraceHitTarget);
+
+	// UFUNCTION(NetMulticast, Reliable)
+	// void MulticastFire(const FVector_NetQuantize &TraceHitTarget);
+
 	UFUNCTION(Server, Reliable)
-	void ServerFire(const FVector_NetQuantize &TraceHitTarget);
+	void ServerWater(bool bIsWaterPressed);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastFire(const FVector_NetQuantize &TraceHitTarget);
+	void MulticastWater(bool bIsWaterPressed);
 
 	void TraceUnderCrosshairs(FHitResult &TraceHitResult);
 
@@ -84,7 +90,7 @@ private:
 	float CrosshairAimFactor;
 	float CrosshairShootingFactor;
 
-	FVector HitTarget;
+	// FVector HitTarget;
 
 	/**
 	 * Aiming and FOV
@@ -109,6 +115,8 @@ private:
 
 	FTimerHandle FireTimer;
 	bool bCanFire = true;
+
+	// FVector_NetQuantize HitTarget;
 
 	void StartFireTimer();
 	void FireTimerFinished();
