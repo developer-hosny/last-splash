@@ -83,6 +83,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = WaterAsFire, meta = (AllowPrivateAccess = "true"))
 	class UNiagaraComponent *WaterNiagara;
 
+	void HandleNiagaraCollision();
+
 #pragma region TracingVariables
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = " Tracing", meta = (AllowPrivateAccess = "true"))

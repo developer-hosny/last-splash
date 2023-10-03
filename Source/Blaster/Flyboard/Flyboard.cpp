@@ -14,10 +14,10 @@ AFlyboard::AFlyboard()
 	// DefaultRoot = CreateDefaultSubobject<USceneComponent>(TEXT("DefaultRoot"));
 	// SetRootComponent(RootComponent);
 	AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
-	// AreaSphere->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform);
+	AreaSphere->AttachToComponent(FlyboardMesh, FAttachmentTransformRules::KeepRelativeTransform);
 	AreaSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	SetRootComponent(AreaSphere);
+	// SetRootComponent(AreaSphere);
 
 	FlyboardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Flyboard"));
 	FlyboardMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);

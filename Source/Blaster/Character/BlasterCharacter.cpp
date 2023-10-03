@@ -27,17 +27,17 @@ ABlasterCharacter::ABlasterCharacter()
 
 	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom2"));
-	CameraBoom->SetupAttachment(GetMesh());
+	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 350;
-	CameraBoom->bUsePawnControlRotation = true;
+	// CameraBoom->bUsePawnControlRotation = true;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera2"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
-	// Make mouse look around character
-	// bUseControllerRotationYaw = false;
-	// GetCharacterMovement()->bOrientRotationToMovement = true;
+	// // Make mouse look around character
+	// // bUseControllerRotationYaw = false;
+	// // GetCharacterMovement()->bOrientRotationToMovement = true;
 
 	OverheadWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget2"));
 	OverheadWidget->SetupAttachment(RootComponent);
@@ -83,6 +83,48 @@ void ABlasterCharacter::BeginPlay()
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ThisClass::ReceiveDamage);
 	}
+
+	// GetCapsuleComponent()->SetRelativeRotation(FRotator(-360.f, -360.f, -360.f), true);
+	// GetMesh()->SetRelativeRotation(FRotator(-360.f, -360.f, -360.f), true);
+}
+
+// Called every frame
+void ABlasterCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// Debug::Print(IsReceviedHit ? "IsReceviedHit: true" : "IsReceviedHit: flase", FColor::Purple, 2);
+
+	HideCameraIfCharacterClose();
+	PollInit();
+
+	// CheckDistanceToFloor();
+
+	AimOffset(DeltaTime);
+	// RotateCharacterTimer();
+	// FRotator InitialRotation = GetActorRotation();
+	// if (Combat->EquippedFlyboard && IsReceviedHit)
+	// {
+	// 	GetCharacterMovement()->bOrientRotationToMovement = true;
+	// 	bUseControllerRotationYaw = false;
+
+	// 	// GetMesh()->AddLocalRotation(FRotator(0.f, 0.f, 2.0f * DeltaTime));
+	// 	InitialRotation.Yaw = InitialRotation.Yaw + 1000.f * DeltaTime;
+	// 	SetActorRotation(InitialRotation);
+	// 	// AddActorLocalRotation(FRotator(0.f, 1000.0f * DeltaTime, 0.f));
+
+	// 	// RotateCharacterTenTimes();
+	// 	// FRotator InitialRotation = GetActorRotation();
+	// 	// SetActorRotation(FRotator(0.f, 360.f, 0.f));
+	// 	// Debug::Print(InitialRotation.ToString(), FColor::Yellow, 1);
+	// }
+	// Debug::Print(InitialRotation.ToString(), FColor::Yellow, 1);
+
+	// Debug::Print(IsMoveInputIgnored() ? "true" : "false", FColor::Yellow, 1);
+	// FVector Start = GetActorLocation();
+	// FVector End = Start + GetActorForwardVector();
+
+	// DoCapsuleTraceMultiByObject(Start, End, true, true);
 }
 
 void ABlasterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty> &OutLifetimeProps) const
@@ -286,7 +328,77 @@ void ABlasterCharacter::ReceiveDamage(AActor *DamagedActor, float Damage, const 
 
 	FVector ForwardVector = AttackerController->GetCharacter()->GetActorForwardVector();
 	ForwardVector.Normalize(); // Ensure it's a unit vector
+							   // LaunchCharacter(ForwardVector * 1000.f, false, false);
+
+	// FRotator InitialRotation = GetActorRotation();
+	// if (Combat->EquippedFlyboard && IsReceviedHit)
+	// {
+
+	// 	GetCharacterMovement()->bOrientRotationToMovement = true;
+	// 	bUseControllerRotationYaw = false;
+	// 	// while (IsReceviedHit)
+	// 	// {
+
+	// 	// GetMesh()->AddLocalRotation(FRotator(0.f, 0.f, 2.0f * DeltaTime));
+	// 	InitialRotation.Yaw = InitialRotation.Yaw + 1000.f * GetWorld()->GetDeltaSeconds();
+	// 	AddActorWorldRotation(InitialRotation);
+	// 	// SetActorRotation(InitialRotation);
+	// 	// AddActorLocalRotation(FRotator(0.f, 1000.0f * DeltaTime, 0.f));
+
+	// 	// RotateCharacterTenTimes();
+	// 	// FRotator InitialRotation = GetActorRotation();
+	// 	// SetActorRotation(FRotator(0.f, 360.f, 0.f));
+	// 	// Debug::Print(InitialRotation.ToString(), FColor::Yellow, 1);
+	// 	// }
+	// }
+
+	// if (Combat->EquippedFlyboard && IsReceviedHit)
+	// {
+	// 	GetCharacterMovement()->bOrientRotationToMovement = true;
+	// 	bUseControllerRotationYaw = false;
+
+	// 	// GetMesh()->AddLocalRotation(FRotator(0.f, 0.f, 2.0f * DeltaTime));
+	// 	InitialRotation.Yaw = InitialRotation.Yaw + 1000.f * DeltaTime;
+	// 	SetActorRotation(InitialRotation);
+	// 	// AddActorLocalRotation(FRotator(0.f, 1000.0f * DeltaTime, 0.f));
+
+	// 	// RotateCharacterTenTimes();
+	// 	// FRotator InitialRotation = GetActorRotation();
+	// 	// SetActorRotation(FRotator(0.f, 360.f, 0.f));
+	// 	// Debug::Print(InitialRotation.ToString(), FColor::Yellow, 1);
+	// }
+	// Debug::Print(InitialRotation.ToString(), FColor::Yellow, 1);
+
+	// RotateCharacterTenTimes();
+
 	DamageCharacter->LaunchCharacter(ForwardVector * 1000.f, false, false);
+
+	// DamageCharacter->AddActorLocalRotation(FRotator(0.f, 0.f, -90.f), true);
+
+	// GetCapsuleComponent()->AddLocalRotation(FRotator(0.f, 0.f, -360.f), true);
+
+	// DamageCharacter->GetCharacterMovement()->AddInputVector(ForwardVector * 1000.f);
+	// SetMovementMode(MOVE_Falling);
+	// DamageCharacter->GetCharacterMovement()->StopMovementImmediately();
+	// if (Combat->EquippedFlyboard)
+	// {
+	// 	// if (HasAuthority())
+	// 	// {
+	// 	// 	DamageCharacter->GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Flying);
+	// 	// }
+	// 	// else
+	// 	// {
+	// 	// GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Flying);
+	// 	ServerResetAfterHit();
+	// 	// }
+
+	// 	// FVector Location = DamageCharacter->GetCh
+	// 	// aracterMovement()->GetActorLocation();
+
+	// 	// DamageCharacter->GetCharacterMovement() - SetActorLocation(FVector(0.f, 0.f, Location.Z));
+	// }
+
+	// AddMovementInput(ForwardVector * 1000.f, 1.0f, true);
 	// DamageCharacter->GetMovementComponent()->AddInputVector(ForwardVector * 1000.f);
 
 	// FVector ImpulseForce = ForwardVector * 1000.f; // ImpulseMagnitude is the strength of the impulse
@@ -458,27 +570,6 @@ void ABlasterCharacter::OnRep_OverlappingWeapon(AWeapon *LastWeapon)
 }
 #pragma endregion
 
-// Called every frame
-void ABlasterCharacter::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	// Debug::Print(IsReceviedHit ? "IsReceviedHit: true" : "IsReceviedHit: flase", FColor::Purple, 2);
-
-	HideCameraIfCharacterClose();
-	PollInit();
-
-	// CheckDistanceToFloor();
-
-	AimOffset(DeltaTime);
-
-	// Debug::Print(IsMoveInputIgnored() ? "true" : "false", FColor::Yellow, 1);
-	// FVector Start = GetActorLocation();
-	// FVector End = Start + GetActorForwardVector();
-
-	// DoCapsuleTraceMultiByObject(Start, End, true, true);
-}
-
 void ABlasterCharacter::CheckDistanceToFloor()
 {
 	// Draw forward line
@@ -551,6 +642,7 @@ void ABlasterCharacter::HandleGroundMovementInput(const FInputActionValue &Value
 
 void ABlasterCharacter::HandleFlyboardMovementInput(const FInputActionValue &Value)
 {
+
 	CheckDistanceToFloor();
 
 	// input is a Vector2D
@@ -579,9 +671,15 @@ void ABlasterCharacter::HandleFlyboardMovementInput(const FInputActionValue &Val
 void ABlasterCharacter::HandleVerticalMovement(const FInputActionValue &Value)
 {
 	// Fix Vertical Move Afrer Hit
+	// TODO: Later create function for this fix
+	if (!GetCharacterMovement()->IsFlying())
+	{
+		EquipOverlappingFlyboard();
+	}
+
 	if (IsReceviedHit)
 	{
-		EquipButtonPressed();
+		// EquipButtonPressed();
 		IsReceviedHit = false;
 	}
 
@@ -826,5 +924,38 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 
 void ABlasterCharacter::OnRep_CharacterMovment()
 {
+	// ReplicatedRotation = GetActorRotation();
 	// Debug::Print(ReplicatedLocation.ToString());
 }
+
+// Example function to rotate the character around itself 10 times
+void ABlasterCharacter::RotateCharacterTimer()
+{
+
+	FRotator InitialRotation = GetActorRotation();
+	if (Combat->EquippedFlyboard && IsReceviedHit)
+	{
+		// GetCharacterMovement()->
+		GetCharacterMovement()->bOrientRotationToMovement = true;
+		bUseControllerRotationYaw = false;
+		// while (IsReceviedHit)
+		// {
+
+		// GetMesh()->AddLocalRotation(FRotator(0.f, 0.f, 2.0f * DeltaTime));
+		InitialRotation.Yaw = InitialRotation.Yaw + 1000.f * GetWorld()->GetDeltaSeconds();
+		AddActorWorldRotation(InitialRotation);
+		// SetActorRotation(InitialRotation);
+		// AddActorLocalRotation(FRotator(0.f, 1000.0f * DeltaTime, 0.f));
+
+		// RotateCharacterTenTimes();
+		// FRotator InitialRotation = GetActorRotation();
+		// SetActorRotation(FRotator(0.f, 360.f, 0.f));
+		// Debug::Print(InitialRotation.ToString(), FColor::Yellow, 1);
+		// }
+	}
+}
+
+// void ABlasterCharacter::ServerResetAfterHit_Implementation()
+// {
+// 	DamageCharacter->GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Flying);
+// }

@@ -82,8 +82,8 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_OverlappingFlyboard)
 	class AFlyboard *OverlappingFlyboard;
 
-	UPROPERTY()
-	class AFlyboard *EquippedFlyboard;
+	// UPROPERTY()
+	// class AFlyboard *EquippedFlyboard;
 
 	UFUNCTION()
 	void OnRep_OverlappingWeapon(AWeapon *LastWeapon);
@@ -320,5 +320,10 @@ public:
 	UFUNCTION()
 	void OnRep_CharacterMovment();
 
+	FTimerHandle TimerHandleActorRotation;
+	void RotateCharacterTimer();
+
+	// UFUNCTION(Server, Reliable)
+	// void ServerResetAfterHit();
 #pragma endregion
 };
